@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel Valle</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0b0b0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Painel Valle">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icones/icone-180.png">
+<style>
+  :root { --bg:#0b0b0c; --fg:#ececec; --mute:#8a8f98; --gold:#c9a961; --card:#141416; --line:#26272b; --red:#e07a7a }
+  * { box-sizing:border-box }
+  html, body { margin:0; background:var(--bg); color:var(--fg); font:300 16px/1.5 Manrope, -apple-system, system-ui, sans-serif; -webkit-text-size-adjust:100% }
+  header { position:sticky; top:0; background:rgba(11,11,12,.92); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); padding:calc(12px + env(safe-area-inset-top)) 16px 10px; display:flex; align-items:baseline; justify-content:space-between }
+  header h1 { margin:0; font-weight:300; font-size:19px; letter-spacing:.03em } header h1 b { color:var(--gold); font-weight:500 }
+  header small { color:var(--mute); font:400 11px/1 "IBM Plex Mono", ui-monospace, monospace }
+  main { padding:12px 16px calc(24px + env(safe-area-inset-bottom)); max-width:720px; margin:0 auto }
+  nav { display:flex; gap:8px; overflow-x:auto; padding:6px 0 12px; scrollbar-width:none } nav::-webkit-scrollbar { display:none }
+  nav button { flex:0 0 auto; padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:transparent; color:var(--mute); font-size:13px }
+  nav button.on { border-color:var(--gold); color:var(--gold) }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px }
+  .card h3 { margin:0 0 4px; font-weight:500; font-size:15px } .card .meta { color:var(--mute); font-size:13px }
+  .card dl { margin:6px 0 0; display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:13px } .card dt { color:var(--mute) } .card dd { margin:0; word-break:break-word }
+  .tag { display:inline-block; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--gold); border:1px solid var(--gold); border-radius:4px; padding:1px 6px; margin-right:6px }
+  .p1 { border-left:3px solid var(--gold) }
+  #senha { max-width:420px; margin:14vh auto 0 } #senha input { width:100%; padding:14px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--fg); font-size:17px; margin-top:8px }
+  #senha button { margin-top:14px; width:100%; padding:14px; border-radius:10px; border:1px solid var(--gold); background:transparent; color:var(--gold); font-size:16px }
+  #senha label.chk { display:flex; gap:8px; align-items:center; color:var(--mute); font-size:14px; margin-top:12px }
+  .erro { color:var(--red) } .mute { color:var(--mute) } .vazio { color:var(--mute); text-align:center; padding:30px 0 }
+  .rodape { color:var(--mute); font-size:12px; text-align:center; margin-top:24px } .rodape a { color:var(--mute) }
+</style>
+</head>
+<body>
+<header><h1>Painel <b>Valle</b></h1><small id="carimbo">—</small></header>
+<main>
+  <section id="senha">
+    <p class="mute">Digite a senha mestra. Ela fica só neste aparelho.</p>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="senha mestra">
+    <label class="chk"><input type="checkbox" id="lembrar" checked> Lembrar neste aparelho</label>
+    <button id="entrar">Abrir</button>
+    <p id="msg" class="erro"></p>
+  </section>
+  <section id="app" hidden>
+    <nav id="abas"></nav>
+    <div id="conteudo"></div>
+    <p class="rodape">O painel do Claude é onde se escreve; este app é a tela rápida de consulta. <a href="#" id="sair">Esquecer a senha neste aparelho</a></p>
+  </section>
+</main>
+<script src="cripto.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const ROTULOS = { decisoes:'Decisões', mesa:'Mesa', fila:'Fila', elenco:'Elenco', jogos:'Jogos', rotina:'Rotina', acervo:'Acervo', recados:'Para mandar', contexto:'Contexto' };
+  const TITULO = ['titulo','pergunta','nome','assunto','item','nomeCompleto'];
+  const OCULTAR = new Set(['id','version','updatedAt','quando','resposta','material','texto_longo']);
+  let privada = null, dados = {}, indice = null, aba = null;
+
+  const fmt = (v) => typeof v === 'object' ? (Array.isArray(v) ? v.map(x => typeof x === 'object' ? (x.rotulo || JSON.stringify(x)) : x).join(' · ') : JSON.stringify(v)) : String(v);
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  function cartao(item) {
+    if (typeof item !== 'object' || item === null) return '<div class="card">' + esc(fmt(item)) + '</div>';
+    const tk = TITULO.find(k => item[k]); const titulo = tk ? item[tk] : '';
+    const pri = item.prioridade || (item.parecer && item.parecer.prioridade);
+    const linhas = Object.entries(item).filter(([k, v]) => k !== tk && !OCULTAR.has(k) && v !== '' && v != null && typeof v !== 'object')
+      .map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(fmt(v)) + '</dd>').join('');
+    const opcoes = Array.isArray(item.opcoes) ? '<dt>opções</dt><dd>' + item.opcoes.map((o, i) => (i === (item.recomendada ?? -1) ? '★ ' : '') + esc(o.rotulo || fmt(o))).join('<br>') + '</dd>' : '';
+    return '<div class="card' + (pri == 1 ? ' p1' : '') + '">' + (item.empresa ? '<span class="tag">' + esc(item.empresa) + '</span>' : '') + (item.quandoBR ? '<span class="meta">' + esc(item.quandoBR) + '</span>' : '')
+      + (titulo ? '<h3>' + esc(titulo) + '</h3>' : '') + (item.contexto ? '<div class="meta">' + esc(item.contexto) + '</div>' : '') + '<dl>' + linhas + opcoes + '</dl></div>';
+  }
+  function render() {
+    const ids = Object.keys(dados);
+    $('abas').innerHTML = ids.map(id => '<button data-id="' + id + '" class="' + (id === aba ? 'on' : '') + '">' + esc(ROTULOS[id] || id) + '</button>').join('');
+    $('abas').querySelectorAll('button').forEach(b => b.onclick = () => { aba = b.dataset.id; render(); });
+    const d = dados[aba];
+    const lista = Array.isArray(d) ? d : (d && Array.isArray(d.itens) ? d.itens : (d && typeof d === 'object' ? Object.values(d) : []));
+    $('conteudo').innerHTML = lista.length ? lista.map(cartao).join('') : (typeof d === 'string' ? '<div class="card">' + esc(d).replace(/\n/g, '<br>') + '</div>' : '<p class="vazio">Nada aqui ainda.</p>');
+  }
+  async function carregar() {
+    const r = await fetch('dados/indice.json', { cache: 'no-store' });
+    if (!r.ok) throw new Error('sem dados publicados ainda');
+    indice = await r.json();
+    $('carimbo').textContent = indice.atualizadoEm ? new Date(indice.atualizadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    dados = {};
+    for (const a of indice.arquivos) {
+      const t = await (await fetch('dados/' + a.arquivo, { cache: 'no-store' })).text();
+      try { dados[a.id] = JSON.parse(await PainelCripto.decifrar(privada, t)); } catch (e) { dados[a.id] = 'Não abriu: ' + e.name; }
+    }
+    aba = aba && dados[aba] ? aba : Object.keys(dados)[0];
+    $('senha').hidden = true; $('app').hidden = false; render();
+  }
+  async function abrir(senha) {
+    $('msg').textContent = ''; $('entrar').textContent = 'Abrindo…';
+    try {
+      const cp = PainelCripto.lerChavePub(await (await fetch('dados/chave.pub', { cache: 'no-store' })).text());
+      const k = await PainelCripto.chaveDaSenha(senha, cp.sal);
+      if (!PainelCripto.iguais(k.publica, cp.publica)) throw new Error('Senha não confere.');
+      privada = k.privada;
+      if ($('lembrar').checked) { try { localStorage.setItem('pv.priv', PainelCripto.b64u.enc(privada)); } catch (e) {} }
+      await carregar();
+    } catch (e) { $('msg').textContent = e.message; }
+    $('entrar').textContent = 'Abrir';
+  }
+  $('entrar').onclick = () => abrir($('pw').value);
+  $('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') abrir($('pw').value); });
+  $('sair').onclick = (e) => { e.preventDefault(); try { localStorage.removeItem('pv.priv'); } catch (x) {} location.reload(); };
+  (async () => {
+    let salva = null; try { salva = localStorage.getItem('pv.priv'); } catch (e) {}
+    if (salva) { privada = PainelCripto.b64u.dec(salva); try { await carregar(); } catch (e) { $('msg').textContent = e.message; } }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  })();
+})();
+</script>
+</body>
+</html>

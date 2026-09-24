@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Painel Valle · configurar</title>
+<meta name="robots" content="noindex">
+<style>
+  :root { --bg:#0b0b0c; --fg:#ececec; --mute:#8a8f98; --gold:#c9a961; --card:#141416; --line:#26272b; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--fg); font:300 16px/1.55 Manrope, -apple-system, system-ui, sans-serif; padding:max(24px, env(safe-area-inset-top)) 16px 40px }
+  main { max-width:520px; margin:0 auto }
+  h1 { font-weight:300; letter-spacing:.02em; font-size:22px; margin:0 0 4px } h1 b { color:var(--gold); font-weight:500 }
+  p { color:var(--mute); margin:8px 0 }
+  label { display:block; margin-top:18px; font-size:13px; color:var(--mute); letter-spacing:.06em; text-transform:uppercase }
+  input { width:100%; margin-top:6px; padding:14px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--fg); font-size:17px }
+  button { margin-top:18px; width:100%; padding:14px; border-radius:10px; border:1px solid var(--gold); background:transparent; color:var(--gold); font-size:16px; letter-spacing:.04em }
+  button:disabled { opacity:.4 }
+  .out { margin-top:22px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; word-break:break-all; font:400 13px/1.5 "IBM Plex Mono", ui-monospace, monospace; display:none }
+  .ok { color:var(--gold) } .erro { color:#e07a7a }
+  ol { padding-left:20px; color:var(--mute) } li { margin:6px 0 }
+  .forca { height:4px; background:var(--line); border-radius:2px; margin-top:8px; overflow:hidden } .forca i { display:block; height:100%; width:0; background:var(--gold); transition:width .2s }
+</style>
+</head>
+<body>
+<main>
+  <h1>Painel <b>Valle</b> · primeira vez</h1>
+  <p>Aqui você cria a <strong>senha mestra</strong>. Ela nunca sai deste aparelho: o que vai para o painel do Claude é só a <em>chave pública</em>, que serve para cifrar — não para abrir.</p>
+
+  <label>Senha mestra</label>
+  <input id="s1" type="password" autocomplete="new-password" placeholder="longa, nova, só do painel">
+  <div class="forca"><i id="forca"></i></div>
+  <label>Repita</label>
+  <input id="s2" type="password" autocomplete="new-password">
+  <button id="btn" disabled>Gerar a chave pública</button>
+
+  <div class="out" id="out"></div>
+
+  <p style="margin-top:26px">Depois de gerar:</p>
+  <ol>
+    <li>Guarde a senha no gerenciador de senhas <em>e</em> em papel, num lugar que a Letícia alcance.</li>
+    <li>Cole a chave pública no painel do Claude (item “App do painel — chave pública”). O Alfred grava em <code>dados/chave.pub</code> e a partir daí cifra tudo para você.</li>
+    <li>Abra o app, digite a senha uma vez e adicione à Tela de Início.</li>
+  </ol>
+  <p>Se a senha se perder, os dados do app viram lixo — o original continua no painel do Claude e o app se refaz com uma senha nova.</p>
+</main>
+<script src="cripto.js"></script>
+<script>
+(() => {
+  const s1 = document.getElementById('s1'), s2 = document.getElementById('s2'), btn = document.getElementById('btn'), out = document.getElementById('out'), forca = document.getElementById('forca');
+  const nota = (s) => { let n = 0; if (s.length >= 12) n++; if (s.length >= 20) n++; if (/[a-z]/.test(s) && /[A-Z]/.test(s)) n++; if (/\d/.test(s)) n++; if (/[^\w\s]/.test(s) || /\s/.test(s)) n++; return n; };
+  const check = () => { const n = nota(s1.value); forca.style.width = (n * 20) + '%'; btn.disabled = !(s1.value.length >= 12 && s1.value === s2.value); };
+  s1.addEventListener('input', check); s2.addEventListener('input', check);
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Calculando (uns segundos)…'; out.style.display = 'block'; out.textContent = '';
+    try {
+      const sal = crypto.getRandomValues(new Uint8Array(16));
+      const k = await PainelCripto.chaveDaSenha(s1.value, sal);
+      out.innerHTML = '<div class="ok">Chave pública gerada. Copie e cole no painel do Claude:</div><br>' + k.chavePub + '<br><br><button id="cp">Copiar</button>';
+      document.getElementById('cp').onclick = () => navigator.clipboard.writeText(k.chavePub).then(() => { document.getElementById('cp').textContent = 'Copiado'; });
+      s1.value = s2.value = ''; check();
+    } catch (e) { out.innerHTML = '<span class="erro">Falhou: ' + e.message + '</span>'; }
+    btn.textContent = 'Gerar a chave pública';
+  });
+})();
+</script>
+</body>
+</html>
