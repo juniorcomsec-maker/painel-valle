@@ -1,0 +1,41 @@
+{
+ "versao": 1,
+ "atualizadoEm": "2026-09-25T00:02:34+00:00",
+ "arquivos": [
+  {
+   "id": "contexto",
+   "arquivo": "contexto.enc",
+   "bytes": 25965
+  },
+  {
+   "id": "decisoes",
+   "arquivo": "decisoes.enc",
+   "bytes": 2064
+  },
+  {
+   "id": "elenco",
+   "arquivo": "elenco.enc",
+   "bytes": 4996
+  },
+  {
+   "id": "jogos",
+   "arquivo": "jogos.enc",
+   "bytes": 14273
+  },
+  {
+   "id": "mesa",
+   "arquivo": "mesa.enc",
+   "bytes": 10073
+  },
+  {
+   "id": "recados",
+   "arquivo": "recados.enc",
+   "bytes": 9077
+  },
+  {
+   "id": "rotina",
+   "arquivo": "rotina.enc",
+   "bytes": 763
+  }
+ ]
+}
